@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   PauseCircle,
   Settings,
@@ -28,6 +29,38 @@ export default function GameScreen({
   onBack,
 }: Props) {
   const isEthereal = dimension === "ethereal";
+  const [player, setPlayer] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      setPlayer((prev) => {
+        let { x, y } = prev;
+        switch (e.key) {
+          case "ArrowUp":
+          case "w":
+            y -= 1;
+            break;
+          case "ArrowDown":
+          case "s":
+            y += 1;
+            break;
+          case "ArrowLeft":
+          case "a":
+            x -= 1;
+            break;
+          case "ArrowRight":
+          case "d":
+            x += 1;
+            break;
+          default:
+            return prev;
+        }
+        return { x, y };
+      });
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   return (
     <div className="relative flex h-screen w-full flex-col overflow-hidden bg-background-dark">
@@ -110,10 +143,10 @@ export default function GameScreen({
               {isConnected ? "Active" : "Simulated"}
             </p>
           </div>
-        </div>
-      </div>
+    </div>
+  </div>
 
-      {/* Game World Container */}
+  {/* Game World Container */}
       <div className="flex-1 relative w-full overflow-hidden flex items-center justify-center">
         {/* Atmospheric Background Elements */}
         <div
