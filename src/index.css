@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #cd2bee;
+  --color-background-light: #f8f6f8;
+  --color-background-dark: #120814;
+  --color-accent-blue: #2b67ee;
+  --color-accent-red: #ee2b4d;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-sans: "Space Grotesk", sans-serif;
+}
+
+@layer utilities {
+  .soft-glow {
+    box-shadow: 0 0 20px rgba(205, 43, 238, 0.3);
+  }
+  .text-glow {
+    text-shadow: 0 0 10px rgba(205, 43, 238, 0.5);
+  }
+  .glass-panel {
+    background: rgba(205, 43, 238, 0.05);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(205, 43, 238, 0.1);
+  }
+}
+
+body {
+  background-color: var(--color-background-dark);
+  color: white;
+  font-family: var(--font-display);
+  overflow-x: hidden;
+}

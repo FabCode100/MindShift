@@ -1,0 +1,5 @@
+{
+  "name": "MindShift",
+  "description": "A minimalist, cinematic 2D educational game prototype integrated with a physical joystick via Bluetooth.",
+  "requestFramePermissions": []
+}
