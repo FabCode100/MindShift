@@ -1,17 +1,5 @@
-import { useState, useEffect } from "react";
-import {
-  PauseCircle,
-  Settings,
-  Sparkles,
-  ArrowDown,
-  ArrowUp,
-  Wifi,
-  Power,
-  GitMerge,
-  Hand,
-  Zap,
-  ArrowLeftRight,
-} from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { PauseCircle, Settings, GitMerge } from "lucide-react";
 
 interface Props {
   isConnected: boolean;
@@ -21,8 +9,14 @@ interface Props {
   onBack: () => void;
 }
 
+interface Platform {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export default function GameScreen({
-  isConnected,
   dimension,
   onShift,
   onComplete,
@@ -30,16 +24,28 @@ export default function GameScreen({
 }: Props) {
   const isEthereal = dimension === "ethereal";
 
-  // 🎮 PLAYER STATE COM FÍSICA
   const [player, setPlayer] = useState({
-    x: 0,
+    x: -300,
     y: 0,
     velocityY: 0,
   });
 
   const [keys, setKeys] = useState<{ [key: string]: boolean }>({});
 
-  // 🎹 CAPTURA CONTÍNUA DE TECLAS
+  // 🧱 MINI LABIRINTO
+  const platforms: Platform[] = useMemo(
+    () => [
+      { x: -350, y: 0, width: 300, height: 20 },   // chão inicial
+      { x: -50, y: 80, width: 200, height: 20 },   // primeira subida
+      { x: 200, y: 160, width: 200, height: 20 },  // plataforma alta
+      { x: 450, y: 0, width: 200, height: 20 },    // lado final
+    ],
+    []
+  );
+
+  const gate = { x: 550, y: 60, size: 60 };
+
+  // 🎹 Teclas
   useEffect(() => {
     const down = (e: KeyboardEvent) =>
       setKeys((prev) => ({ ...prev, [e.key]: true }));
@@ -49,176 +55,155 @@ export default function GameScreen({
 
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
-
     return () => {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
   }, []);
 
-  // 🔄 GAME LOOP COM GRAVIDADE
+  // 🔄 GAME LOOP
   useEffect(() => {
-    let animationFrame: number;
+    let frame: number;
 
     const gravity = isEthereal ? -0.4 : 0.4;
     const moveSpeed = 3;
-    const jumpForce = 8;
+    const jumpForce = 9;
 
     function loop() {
       setPlayer((prev) => {
         let { x, y, velocityY } = prev;
 
-        // Movimento horizontal
-        if (keys["ArrowLeft"] || keys["a"]) x -= moveSpeed;
-        if (keys["ArrowRight"] || keys["d"]) x += moveSpeed;
+        // Movimento lateral
+        if (keys["a"] || keys["ArrowLeft"]) x -= moveSpeed;
+        if (keys["d"] || keys["ArrowRight"]) x += moveSpeed;
 
-        // Verifica chão
-        const onGround = isEthereal ? y <= 0 : y >= 0;
-
-        // Pulo
-        if ((keys[" "] || keys["Space"]) && onGround) {
-          velocityY = isEthereal ? jumpForce : -jumpForce;
-        }
-
-        // Gravidade
         velocityY += gravity;
         y += velocityY;
 
-        // Colisão com chão
-        if (isEthereal && y < 0) {
-          y = 0;
-          velocityY = 0;
+        // Colisão com plataformas
+        platforms.forEach((p) => {
+          const playerWidth = 32;
+          const playerHeight = 32;
+
+          const px = x;
+          const py = y;
+
+          const onPlatform =
+            px + playerWidth > p.x &&
+            px < p.x + p.width &&
+            py + playerHeight > p.y &&
+            py + playerHeight < p.y + p.height + 20 &&
+            velocityY >= 0;
+
+          if (!isEthereal && onPlatform) {
+            y = p.y - playerHeight;
+            velocityY = 0;
+          }
+
+          const onPlatformInverted =
+            px + playerWidth > p.x &&
+            px < p.x + p.width &&
+            py < p.y + p.height &&
+            py > p.y - 20 &&
+            velocityY <= 0;
+
+          if (isEthereal && onPlatformInverted) {
+            y = p.y + p.height;
+            velocityY = 0;
+          }
+        });
+
+        // Pulo
+        const grounded = velocityY === 0;
+        if ((keys[" "] || keys["Space"]) && grounded) {
+          velocityY = isEthereal ? 9 : -9;
         }
 
-        if (!isEthereal && y > 0) {
-          y = 0;
-          velocityY = 0;
-        }
+        // Limites
+        x = Math.max(-380, Math.min(700, x));
 
-        // Limite lateral
-        x = Math.max(-300, Math.min(300, x));
+        // Vitória automática
+        if (
+          x + 32 > gate.x &&
+          x < gate.x + gate.size &&
+          y + 32 > gate.y &&
+          y < gate.y + gate.size
+        ) {
+          onComplete();
+        }
 
         return { x, y, velocityY };
       });
 
-      animationFrame = requestAnimationFrame(loop);
+      frame = requestAnimationFrame(loop);
     }
 
-    animationFrame = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(animationFrame);
-  }, [keys, isEthereal]);
+    frame = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(frame);
+  }, [keys, isEthereal, platforms, onComplete]);
 
-  // 🔁 SHIFT VIA TECLADO
+  // Shift via teclado
   useEffect(() => {
-    if (keys["Shift"]) {
-      onShift();
-    }
+    if (keys["Shift"]) onShift();
   }, [keys, onShift]);
 
   return (
-    <div className="relative flex h-screen w-full flex-col overflow-hidden bg-background-dark">
-      
-      {/* HUD TOP */}
-      <div className="flex items-center bg-background-dark/80 backdrop-blur-md p-4 pb-2 justify-between border-b border-primary/20 z-20">
-        <button
-          onClick={onBack}
-          className="text-primary flex size-12 items-center justify-center hover:bg-primary/10 rounded-full transition-colors"
-        >
+    <div className="relative h-screen w-full bg-black overflow-hidden">
+
+      {/* HUD */}
+      <div className="absolute top-0 left-0 w-full p-4 flex justify-between z-20">
+        <button onClick={onBack} className="text-white">
           <PauseCircle size={28} />
         </button>
-
-        <div className="flex flex-col items-center flex-1">
-          <h2 className="text-primary text-lg font-bold tracking-wider uppercase">
-            MindShift
-          </h2>
-        </div>
-
-        <div className="flex w-12 items-center justify-end">
-          <Settings size={24} className="text-slate-400" />
-        </div>
+        <h2 className="text-white font-bold tracking-widest">
+          MindShift - Mini Lab
+        </h2>
+        <Settings size={24} className="text-white" />
       </div>
 
-      {/* STATUS */}
-      <div className="flex gap-4 p-4 z-20">
-        <div className="flex-1 rounded-xl p-4 border backdrop-blur-sm">
-          <p className="text-xs uppercase tracking-widest text-slate-400">
-            Dimension
-          </p>
-          <p className="text-white text-xl font-bold capitalize">
-            {dimension}
-          </p>
-        </div>
+      {/* WORLD */}
+      <div className="relative w-full h-full flex items-center justify-center">
 
-        <div className="flex-1 rounded-xl p-4 border backdrop-blur-sm">
-          <p className="text-xs uppercase tracking-widest text-slate-400">
-            Gravity
-          </p>
-          <p className="text-white text-xl font-bold">
-            {isEthereal ? "Normal" : "Inverted"}
-          </p>
-        </div>
+        {/* Plataformas */}
+        {platforms.map((p, i) => (
+          <div
+            key={i}
+            className="absolute bg-gradient-to-r from-purple-500/30 to-blue-500/30 border border-white/10 rounded-full"
+            style={{
+              left: `calc(50% + ${p.x}px)`,
+              bottom: `calc(30% + ${p.y}px)`,
+              width: p.width,
+              height: p.height,
+            }}
+          />
+        ))}
 
-        <div className="flex-1 rounded-xl p-4 border backdrop-blur-sm">
-          <p className="text-xs uppercase tracking-widest text-slate-400">
-            Connection
-          </p>
-          <p className="text-white text-xl font-bold">
-            {isConnected ? "Active" : "Simulated"}
-          </p>
-        </div>
-      </div>
-
-      {/* GAME WORLD */}
-      <div className="flex-1 relative overflow-hidden flex items-center justify-center">
-        
-        {/* PLAYER COM TRANSFORM GPU */}
+        {/* Gate */}
         <div
-          className="absolute size-8 bg-white rounded-full flex items-center justify-center
-                     shadow-[0_0_20px_5px_rgba(255,255,255,0.6)]"
+          className="absolute border-2 border-green-400 bg-green-500/10 rounded-lg flex items-center justify-center shadow-[0_0_20px_rgba(0,255,120,0.5)]"
           style={{
-            left: "20%",
-            bottom: "28%",
-            transform: `translate(${player.x}px, ${-player.y}px)`,
+            left: `calc(50% + ${gate.x}px)`,
+            bottom: `calc(30% + ${gate.y}px)`,
+            width: gate.size,
+            height: gate.size,
           }}
         >
-          <div
-            className={`size-4 rounded-full blur-sm ${
-              isEthereal ? "bg-primary/50" : "bg-accent-red/50"
-            }`}
-          />
+          <GitMerge size={32} className="text-green-400" />
         </div>
 
-        {/* GATE SIMPLES */}
+        {/* Player */}
         <div
-          onClick={onComplete}
-          className="absolute right-20 bottom-28 size-16 rounded-lg border-2 border-primary/40 bg-primary/5 flex items-center justify-center cursor-pointer hover:bg-primary/20 transition"
-        >
-          <GitMerge size={32} className="text-primary" />
-        </div>
+          className="absolute size-8 bg-white rounded-full shadow-[0_0_20px_5px_rgba(255,255,255,0.6)]"
+          style={{
+            left: `calc(50% + ${player.x}px)`,
+            bottom: `calc(30% + ${player.y}px)`,
+          }}
+        />
       </div>
 
-      {/* CONTROLS HUD */}
-      <div className="bg-background-dark/90 border-t border-primary/20 p-4 z-20">
-        <div className="flex justify-between items-center">
-          <div className="flex gap-4">
-            <span className="text-xs text-slate-400">
-              A/D → Move
-            </span>
-            <span className="text-xs text-slate-400">
-              Space → Jump
-            </span>
-            <span className="text-xs text-slate-400">
-              Shift → Dimension
-            </span>
-          </div>
-
-          <button
-            onClick={onShift}
-            className="px-4 py-2 rounded-xl bg-primary/20 border border-primary/40 hover:bg-primary/30 transition"
-          >
-            Shift Dimension
-          </button>
-        </div>
+      {/* Controles */}
+      <div className="absolute bottom-0 w-full p-4 text-center text-xs text-gray-400">
+        A/D → Mover | Space → Pular | Shift → Inverter Gravidade
       </div>
     </div>
   );
